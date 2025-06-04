@@ -1,0 +1,98 @@
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwidXNlcm5hbWUiOiJwZWFjZSIsImVtYWlsIjoicGVhY2VAYWRtaW4uY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ4NTIyMTM2LCJleHAiOjE3NDg2MDg1MzZ9.q9vtolS6aB-6h3j81nVTVpDwSw5g_OA2xHTWB1xBPds
+
+### Register User (POST /auth/register)
+POST http://localhost:5000/auth/register
+Content-Type: application/json
+
+{
+  "username": "pis",
+  "email": "pis@example.com",
+  "password": "123",
+  "role": "customer"
+}
+
+### Register User (POST /auth/register)
+POST http://localhost:5000/auth/register
+Content-Type: application/json
+
+{
+  "username": "peace",
+  "email": "peace@admin.com",
+  "password": "123",
+  "role": "admin"
+}
+
+### Login Admin (POST /auth/login)
+POST http://localhost:5000/auth/login
+Content-Type: application/json
+
+{
+  "email": "peace@admin.com",
+  "password": "123"
+}
+
+### Login Customer (POST /auth/login)
+POST http://localhost:5000/auth/login
+Content-Type: application/json
+
+{
+  "email": "pis@example.com",
+  "password": "123"
+}
+
+### Get All Tables (GET /tables)
+GET http://localhost:5000/tables
+
+### Create Table (POST /tables) - admin only, gunakan token dari login
+POST http://localhost:5000/tables
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Meja A",
+  "status": "available",
+  "image_url": "https://example.com/images/mejaA.jpg"
+}
+
+### Update Table (PUT /tables/:id) - admin only
+PUT http://localhost:5000/tables/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "booked"
+}
+
+### Delete Table (DELETE /tables/:id) - admin only
+DELETE http://localhost:5000/tables/1
+Authorization: Bearer {{token}}
+
+### Get All Bookings (GET /bookings) - admin or customer
+GET http://localhost:5000/bookings
+Authorization: Bearer {{token}}
+
+### Create Booking (POST /bookings) - customer only
+POST http://localhost:5000/bookings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "user_id": 1,
+  "table_id": 1,
+  "date": "2025-06-01",
+  "start_time": "12:00",
+  "end_time": "13:00"
+}
+
+### Update Booking Status (PUT /bookings/:id) - admin only
+PUT http://localhost:5000/bookings/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### Delete Booking (DELETE /bookings/:id) - admin only
+DELETE http://localhost:5000/bookings/1
+Authorization: Bearer {{token}}
