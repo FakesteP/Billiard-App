@@ -1,206 +1,138 @@
-// ================================
-// lib/screens/admin/table_list_screen.dart - List Meja Admin
-// ================================
 import 'package:flutter/material.dart';
-import '../../constants.dart';
-import '../../routes.dart';
+import 'package:provider/provider.dart';
 import '../../models/table_model.dart';
 import '../../services/table_service.dart';
+import 'table_form_screen.dart';
 
 class TableListScreen extends StatefulWidget {
+  const TableListScreen({super.key});
+
   @override
-  _TableListScreenState createState() => _TableListScreenState();
+  State<TableListScreen> createState() => _TableListScreenState();
 }
 
 class _TableListScreenState extends State<TableListScreen> {
-  List<TableModel> _tables = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadTables();
-  }
-
-  _loadTables() async {
-    setState(() {
-      _isLoading = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TableService>(context, listen: false).fetchTables();
     });
-
-    try {
-      List<TableModel> tables = await TableService.getAllTables();
-      setState(() {
-        _tables = tables;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat data meja')),
-      );
-    }
   }
 
-  _deleteTable(String tableId) async {
-    bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Konfirmasi'),
-        content: Text('Apakah Anda yakin ingin menghapus meja ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Hapus', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      bool success = await TableService.deleteTable(tableId);
-      if (success) {
-        _loadTables();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Meja berhasil dihapus')),
-        );
-      }
-    }
+  Future<void> _refreshTables() async {
+    await Provider.of<TableService>(context, listen: false).fetchTables();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final tableService = Provider.of<TableService>(context);
+
     return Scaffold(
-      backgroundColor: AppConstants.backgroundColor,
       appBar: AppBar(
-        title: Text('Manajemen Meja'),
-        backgroundColor: AppConstants.primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: () {
-              Navigator.pushNamed(context, AppRoutes.tableForm).then((_) {
-                _loadTables();
-              });
-            },
-          ),
-        ],
+        title: const Text('Manage Tables'),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: _tables.length,
-              itemBuilder: (context, index) {
-                TableModel table = _tables[index];
-                return Card(
-                  margin: EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: _getStatusColor(table.status),
-                      child: Icon(
-                        Icons.table_restaurant,
-                        color: Colors.white,
+      body: tableService.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _refreshTables,
+              child: ListView.builder(
+                itemCount: tableService.tables.length,
+                itemBuilder: (context, index) {
+                  final TableModel table = tableService.tables[index];
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    child: ListTile(
+                      leading: (table.imageUrl.isNotEmpty && (table.imageUrl.startsWith('http://') || table.imageUrl.startsWith('https://')))
+                          ? CircleAvatar(
+                              backgroundImage: NetworkImage(table.imageUrl),
+                            )
+                          : const CircleAvatar(child: Icon(Icons.table_bar)),
+                      title: Text(table.name),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Status: ${table.status}'),
+                          if (table.createdAt.isNotEmpty)
+                            Text('Created: ${table.createdAt}',
+                                style: const TextStyle(fontSize: 12)),
+                          if (table.updatedAt.isNotEmpty)
+                            Text('Updated: ${table.updatedAt}',
+                                style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () async {
+                              await Navigator.pushNamed(
+                                context,
+                                '/admin/tables/form',
+                                arguments: table,
+                              );
+                              await _refreshTables();
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () async {
+                              await _deleteTable(context, table.id);
+                              await _refreshTables();
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                    title: Text(
-                      table.name,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(table.description),
-                        Text(
-                          'Rp ${table.pricePerHour.toStringAsFixed(0)}/jam',
-                          style: TextStyle(
-                            color: AppConstants.primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Chip(
-                          label: Text(
-                            _getStatusText(table.status),
-                            style: TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                          backgroundColor: _getStatusColor(table.status),
-                        ),
-                        PopupMenuButton(
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit),
-                                  SizedBox(width: 8),
-                                  Text('Edit'),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('Hapus', style: TextStyle(color: Colors.red)),
-                                ],
-                              ),
-                            ),
-                          ],
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              Navigator.pushNamed(
-                                context,
-                                AppRoutes.tableForm,
-                                arguments: table,
-                              ).then((_) {
-                                _loadTables();
-                              });
-                            } else if (value == 'delete') {
-                              _deleteTable(table.id);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.pushNamed(
+            context,
+            '/admin/tables/form',
+            arguments: null,
+          );
+          await _refreshTables();
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
-  Color _getStatusColor(TableStatus status) {
-    switch (status) {
-      case TableStatus.available:
-        return Colors.green;
-      case TableStatus.booked:
-        return Colors.orange;
-      case TableStatus.maintenance:
-        return Colors.red;
-    }
-  }
+  Future<void> _deleteTable(BuildContext context, String tableId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this table?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
 
-  String _getStatusText(TableStatus status) {
-    switch (status) {
-      case TableStatus.available:
-        return 'Tersedia';
-      case TableStatus.booked:
-        return 'Sedang Digunakan';
-      case TableStatus.maintenance:
-        return 'Maintenance';
+    if (confirmed == true) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      await Provider.of<TableService>(context, listen: false)
+          .deleteTable(tableId);
+      Navigator.pop(context); // Tutup loading dialog
     }
   }
 }

@@ -1,16 +1,14 @@
-// ================================
-// lib/screens/login_screen.dart - Halaman Login
-// ================================
 import 'package:flutter/material.dart';
-import '../constants.dart';
-import '../routes.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_textfield.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -18,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -27,34 +25,40 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  _login() async {
+  Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
+        _errorMessage = null;
       });
-
-      bool success = await AuthService.login(
-        _emailController.text,
-        _passwordController.text,
-      );
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (success) {
-        if (AuthService.isAdmin) {
-          Navigator.pushReplacementNamed(context, AppRoutes.adminHome);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.userHome);
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Email atau password salah'),
-            backgroundColor: AppConstants.errorColor,
-          ),
+      final authService = Provider.of<AuthService>(context, listen: false);
+      try {
+        await authService.login(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
         );
+
+        if (authService.isAuthenticated) {
+          final role = authService.role;
+          if (role == 'admin') {
+            Navigator.pushReplacementNamed(context, '/admin/home');
+          } else {
+            Navigator.pushReplacementNamed(context, '/user/home');
+          }
+        } else {
+          setState(() {
+            _errorMessage =
+                authService.errorMessage ?? 'Login failed. Please try again.';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'Login failed. Please try again.';
+        });
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -62,123 +66,60 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConstants.backgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 50),
-                Center(
-                  child: Icon(
-                    Icons.sports_bar,
-                    size: 80,
-                    color: AppConstants.primaryColor,
-                  ),
-                ),
-                SizedBox(height: 20),
-                Center(
+      appBar: AppBar(title: const Text('Login')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
                   child: Text(
-                    AppConstants.loginTitle,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppConstants.primaryColor,
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              CustomTextField(
+                controller: _emailController,
+                label: 'Email',
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your email';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: _passwordController,
+                label: 'Password',
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your password';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 24),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : CustomButton(
+                      text: 'Login',
+                      onPressed: _isLoading ? null : _login,
                     ),
-                  ),
-                ),
-                SizedBox(height: 40),
-                CustomTextField(
-                  label: 'Email',
-                  hint: 'Masukkan email Anda',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  prefixIcon: Icon(Icons.email),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Email tidak boleh kosong';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Email tidak valid';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 20),
-                CustomTextField(
-                  label: 'Password',
-                  hint: 'Masukkan password Anda',
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  prefixIcon: Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Password tidak boleh kosong';
-                    }
-                    if (value.length < 6) {
-                      return 'Password minimal 6 karakter';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 30),
-                CustomButton(
-                  text: 'Login',
-                  onPressed: _login,
-                  isLoading: _isLoading,
-                ),
-                SizedBox(height: 20),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, AppRoutes.register);
-                    },
-                    child: Text(
-                      'Belum punya akun? Daftar sekarang',
-                      style: TextStyle(color: AppConstants.primaryColor),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 30),
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Demo Login:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppConstants.primaryColor,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text('Admin: admin@billiard.com / admin123'),
-                      Text('User: user@billiard.com / user123'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/register');
+                },
+                child: const Text('Don\'t have an account? Register here'),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
-

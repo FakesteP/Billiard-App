@@ -1,12 +1,12 @@
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwidXNlcm5hbWUiOiJwZWFjZSIsImVtYWlsIjoicGVhY2VAYWRtaW4uY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ4NTIyMTM2LCJleHAiOjE3NDg2MDg1MzZ9.q9vtolS6aB-6h3j81nVTVpDwSw5g_OA2xHTWB1xBPds
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAsInVzZXJuYW1lIjoibWFzIiwiZW1haWwiOiJtYXNAZ21haWwuY29tIiwicm9sZSI6ImN1c3RvbWVyIiwiaWF0IjoxNzQ5MDQ0OTkxLCJleHAiOjE3NDkxMzEzOTF9.r1ECgUKrK3OjZdN_q25TpwBZ6gbkicR87-9H38v9LO4
 
 ### Register User (POST /auth/register)
 POST http://localhost:5000/auth/register
 Content-Type: application/json
 
 {
-  "username": "pis",
-  "email": "pis@example.com",
+  "username": "pis1",
+  "email": "pis1@example.com",
   "password": "123",
   "role": "customer"
 }
@@ -36,8 +36,8 @@ POST http://localhost:5000/auth/login
 Content-Type: application/json
 
 {
-  "email": "pis@example.com",
-  "password": "123"
+  "email": "mas@gmail.com",
+  "password": "masmas"
 }
 
 ### Get All Tables (GET /tables)
@@ -60,7 +60,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "status": "booked"
+  "status": "pending"
 }
 
 ### Delete Table (DELETE /tables/:id) - admin only
@@ -80,8 +80,8 @@ Content-Type: application/json
   "user_id": 1,
   "table_id": 1,
   "date": "2025-06-01",
-  "start_time": "12:00",
-  "end_time": "13:00"
+  "start_time": "15:00",
+  "end_time": "16:00"
 }
 
 ### Update Booking Status (PUT /bookings/:id) - admin only

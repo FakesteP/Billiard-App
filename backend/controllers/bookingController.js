@@ -67,7 +67,7 @@ export const createBooking = async (req, res) => {
       date,
       start_time,
       end_time,
-      status: "booked",
+      status: "pending", // Status awal booking
     });
 
     // Update status meja jadi 'booked'
@@ -100,8 +100,8 @@ export const updateBookingStatus = async (req, res) => {
     // Update status meja sesuai status booking
     if (newStatus === "completed" || newStatus === "cancelled") {
       table.status = "available";
-    } else if (newStatus === "booked" || newStatus === "pending") {
-      table.status = "booked";
+    } else if (newStatus === "pending" || newStatus === "pending") {
+      table.status = "pending";
     }
     await table.save();
 

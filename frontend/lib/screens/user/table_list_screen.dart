@@ -1,241 +1,155 @@
-// ================================
-// lib/screens/user/table_list_screen.dart - Daftar Meja untuk User
-// ================================
 import 'package:flutter/material.dart';
-import '../../constants.dart';
+import 'package:provider/provider.dart';
 import '../../models/table_model.dart';
 import '../../services/table_service.dart';
+import '../../services/booking_service.dart';
+import 'booking_form_screen.dart';
 
 class TableListScreen extends StatefulWidget {
+  const TableListScreen({super.key});
+
   @override
-  _TableListScreenState createState() => _TableListScreenState();
+  State<TableListScreen> createState() => _TableListScreenState();
 }
 
 class _TableListScreenState extends State<TableListScreen> {
-  List<TableModel> tables = [];
-  bool isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadTables();
-  }
-
-  _loadTables() async {
-    try {
-      final loadedTables = await TableService.getTables();
-      setState(() {
-        tables = loadedTables;
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading tables: $e')),
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TableService>(context, listen: false).fetchTables();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final tableService = Provider.of<TableService>(context);
+
     return Scaffold(
-      backgroundColor: AppConstants.backgroundColor,
       appBar: AppBar(
-        title: Text('Pilih Meja Bilyar'),
-        backgroundColor: AppConstants.primaryColor,
-        foregroundColor: Colors.white,
+        title: const Text('Available Tables'),
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () async => _loadTables(),
-              child: tables.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.table_restaurant,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Belum ada meja tersedia',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: EdgeInsets.all(16),
-                      itemCount: tables.length,
-                      itemBuilder: (context, index) {
-                        final table = tables[index];
-                        return _buildTableCard(table);
-                      },
+      body: tableService.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: tableService.tables.length,
+              itemBuilder: (context, index) {
+                final table = tableService.tables[index];
+                return Card(
+                  margin:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: ListTile(
+                    leading: (table.imageUrl.isNotEmpty &&
+                            (table.imageUrl.startsWith('http://') ||
+                                table.imageUrl.startsWith('https://')))
+                        ? CircleAvatar(
+                            backgroundImage: NetworkImage(table.imageUrl),
+                          )
+                        : const CircleAvatar(child: Icon(Icons.table_bar)),
+                    title: Text(table.name),
+                    subtitle: Text('Status: ${table.status}'),
+                    trailing: ElevatedButton(
+                      onPressed: table.status == 'available'
+                          ? () {
+                              _showBookingDialog(context, table.id);
+                            }
+                          : null,
+                      child: const Text('Book Now'),
                     ),
+                  ),
+                );
+              },
             ),
     );
   }
 
-  Widget _buildTableCard(TableModel table) {
-    Color statusColor;
-    String statusText;
-    bool canBook = false;
+  void _showBookingDialog(BuildContext context, String tableId) {
+    final _dateController = TextEditingController();
+    final _startTimeController = TextEditingController();
+    final _endTimeController = TextEditingController();
+    final _formKey = GlobalKey<FormState>();
+    bool _isLoading = false;
 
-    switch (table.status) {
-      case 'available':
-        statusColor = Colors.green;
-        statusText = 'Tersedia';
-        canBook = true;
-        break;
-      case 'occupied':
-        statusColor = Colors.red;
-        statusText = 'Sedang Digunakan';
-        break;
-      case 'booked':
-        statusColor = Colors.orange;
-        statusText = 'Sudah Dibooking';
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusText = 'Tidak Tersedia';
-    }
-
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      elevation: 3,
-      child: InkWell(
-        onTap: canBook ? () => _showBookingDialog(table) : null,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: AppConstants.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.table_restaurant,
-                  size: 32,
-                  color: AppConstants.primaryColor,
-                ),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      table.name,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Rp ${table.pricePerHour.toStringAsFixed(0)}/jam',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppConstants.primaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (canBook)
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey,
-                  size: 16,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showBookingDialog(TableModel table) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Booking ${table.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Harga: Rp ${table.pricePerHour.toStringAsFixed(0)}/jam'),
-            SizedBox(height: 8),
-            Text('Apakah Anda yakin ingin booking meja ini?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _bookTable(table);
-            },
-            child: Text('Booking'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryColor,
-              foregroundColor: Colors.white,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Book Table'),
+            content: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _dateController,
+                    decoration:
+                        const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Enter date' : null,
+                  ),
+                  TextFormField(
+                    controller: _startTimeController,
+                    decoration:
+                        const InputDecoration(labelText: 'Start Time (HH:MM)'),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Enter start time' : null,
+                  ),
+                  TextFormField(
+                    controller: _endTimeController,
+                    decoration:
+                        const InputDecoration(labelText: 'End Time (HH:MM)'),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Enter end time' : null,
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: _isLoading
+                    ? null
+                    : () async {
+                        if (_formKey.currentState!.validate()) {
+                          setState(() => _isLoading = true);
+                          try {
+                            await Provider.of<BookingService>(context,
+                                    listen: false)
+                                .createBooking(
+                              tableId: tableId,
+                              date: _dateController.text.trim(),
+                              startTime: _startTimeController.text.trim(),
+                              endTime: _endTimeController.text.trim(),
+                            );
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Booking successful!')),
+                            );
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Booking failed: $e')),
+                            );
+                          } finally {
+                            setState(() => _isLoading = false);
+                          }
+                        }
+                      },
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Book'),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
-  }
-
-  void _bookTable(TableModel table) async {
-    try {
-      // TODO: Implement booking logic
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Booking ${table.name} berhasil!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _loadTables(); // Refresh data
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal booking: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 }

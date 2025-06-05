@@ -1,63 +1,113 @@
-// ================================
-// lib/services/table_service.dart - Service Meja
-// ================================
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/table_model.dart';
+import '../constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class TableService {
-  // Mock data - ganti dengan API call
-  static List<TableModel> _tables = [
-    TableModel(
-      id: '1',
-      name: 'Meja VIP 1',
-      description: 'Meja bilyar premium dengan pencahayaan terbaik',
-      imageUrl: 'https://example.com/table1.jpg',
-      status: TableStatus.available,
-      pricePerHour: 50000,
-      createdAt: DateTime.now().subtract(Duration(days: 30)),
-      updatedAt: DateTime.now(),
-    ),
-    TableModel(
-      id: '2',
-      name: 'Meja Reguler 1',
-      description: 'Meja bilyar standar untuk permainan casual',
-      imageUrl: 'https://example.com/table2.jpg',
-      status: TableStatus.booked,
-      pricePerHour: 30000,
-      createdAt: DateTime.now().subtract(Duration(days: 25)),
-      updatedAt: DateTime.now(),
-    ),
-  ];
-  
-  static Future<List<TableModel>> getAllTables() async {
-    await Future.delayed(Duration(seconds: 1));
-    return _tables;
-  }
-  
-  static Future<List<TableModel>> getAvailableTables() async {
-    await Future.delayed(Duration(seconds: 1));
-    return _tables.where((table) => table.status == TableStatus.available).toList();
-  }
-  
-  static Future<bool> addTable(TableModel table) async {
-    await Future.delayed(Duration(seconds: 1));
-    _tables.add(table);
-    return true;
-  }
-  
-  static Future<bool> updateTable(TableModel table) async {
-    await Future.delayed(Duration(seconds: 1));
-    int index = _tables.indexWhere((t) => t.id == table.id);
-    if (index != -1) {
-      _tables[index] = table;
-      return true;
+class TableService with ChangeNotifier {
+  List<TableModel> _tables = [];
+  bool _isLoading = false;
+
+  List<TableModel> get tables => _tables;
+  bool get isLoading => _isLoading;
+
+  Future<void> fetchTables() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.get(
+        Uri.parse(ApiConstants.tables),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        _tables = data.map((json) => TableModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load tables');
+      }
+    } catch (e) {
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    return false;
   }
-  
-  static Future<bool> deleteTable(String tableId) async {
-    await Future.delayed(Duration(seconds: 1));
-    _tables.removeWhere((table) => table.id == tableId);
-    return true;
+
+  Future<void> addTable(TableModel table) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.post(
+        Uri.parse(ApiConstants.tables),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(table.toJson()),
+      );
+
+      if (response.statusCode == 201) {
+        await fetchTables();
+      } else {
+        throw Exception('Failed to add table');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateTable(TableModel table) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.put(
+        Uri.parse('${ApiConstants.tables}/${table.id}'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(table.toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchTables();
+      } else {
+        throw Exception('Failed to update table');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTable(String tableId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.delete(
+        Uri.parse('${ApiConstants.tables}/$tableId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await fetchTables();
+      } else {
+        throw Exception('Failed to delete table');
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 }
-

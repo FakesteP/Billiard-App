@@ -1,95 +1,170 @@
-// ================================
-// lib/services/booking_service.dart - Service Booking
-// ================================
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/booking_model.dart';
-import 'auth_service.dart';
+import '../constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
-class BookingService {
-  static List<BookingModel> _bookings = [
-    BookingModel(
-      id: '1',
-      userId: '2',
-      tableId: '1',
-      bookingDate: DateTime.now(),
-      startTime: DateTime.now().add(Duration(hours: 1)),
-      endTime: DateTime.now().add(Duration(hours: 3)),
-      status: BookingStatus.confirmed,
-      totalPrice: 100000,
-      createdAt: DateTime.now(),
-    ),
-  ];
-  
-  static Future<List<BookingModel>> getAllBookings() async {
-    await Future.delayed(Duration(seconds: 1));
-    return _bookings;
-  }
-  
-  static Future<List<BookingModel>> getUserBookings(String userId) async {
-    await Future.delayed(Duration(seconds: 1));
-    return _bookings.where((booking) => booking.userId == userId).toList();
-  }
-  
-  static Future<bool> createBooking(BookingModel booking) async {
-    await Future.delayed(Duration(seconds: 1));
-    _bookings.add(booking);
-    return true;
-  }
-  
-  static Future<bool> updateBookingStatus(String bookingId, BookingStatus status) async {
-    await Future.delayed(Duration(seconds: 1));
-    int index = _bookings.indexWhere((b) => b.id == bookingId);
-    if (index != -1) {
-      BookingModel oldBooking = _bookings[index];
-      _bookings[index] = BookingModel(
-        id: oldBooking.id,
-        userId: oldBooking.userId,
-        tableId: oldBooking.tableId,
-        bookingDate: oldBooking.bookingDate,
-        startTime: oldBooking.startTime,
-        endTime: oldBooking.endTime,
-        status: status,
-        totalPrice: oldBooking.totalPrice,
-        player1Score: oldBooking.player1Score,
-        player2Score: oldBooking.player2Score,
-        winnerId: oldBooking.winnerId,
-        pointsEarned: oldBooking.pointsEarned,
-        createdAt: oldBooking.createdAt,
+class BookingService with ChangeNotifier {
+  List<BookingModel> _bookings = [];
+  List<BookingModel> _userBookings = [];
+  bool _isLoading = false;
+
+  List<BookingModel> get bookings => _bookings;
+  List<BookingModel> get userBookings => _userBookings;
+  bool get isLoading => _isLoading;
+
+  Future<void> fetchBookings() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.get(
+        Uri.parse(ApiConstants.bookings),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
       );
-      return true;
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        _bookings = data.map((json) => BookingModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load bookings');
+      }
+    } catch (e) {
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    return false;
   }
-  
-  static Future<bool> updateGameResult(String bookingId, int player1Score, int player2Score, String? winnerId) async {
-    await Future.delayed(Duration(seconds: 1));
-    int index = _bookings.indexWhere((b) => b.id == bookingId);
-    if (index != -1) {
-      BookingModel oldBooking = _bookings[index];
-      int pointsEarned = _calculatePoints(oldBooking.duration, winnerId == oldBooking.userId);
-      
-      _bookings[index] = BookingModel(
-        id: oldBooking.id,
-        userId: oldBooking.userId,
-        tableId: oldBooking.tableId,
-        bookingDate: oldBooking.bookingDate,
-        startTime: oldBooking.startTime,
-        endTime: oldBooking.endTime,
-        status: BookingStatus.completed,
-        totalPrice: oldBooking.totalPrice,
-        player1Score: player1Score,
-        player2Score: player2Score,
-        winnerId: winnerId,
-        pointsEarned: pointsEarned,
-        createdAt: oldBooking.createdAt,
+
+  Future<void> fetchUserBookings() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      // Ganti endpoint ke /bookings (tanpa /me)
+      final response = await http.get(
+        Uri.parse(ApiConstants.bookings),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
       );
-      return true;
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        _userBookings =
+            data.map((json) => BookingModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load user bookings');
+      }
+    } catch (e) {
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    return false;
   }
-  
-  static int _calculatePoints(Duration duration, bool isWinner) {
-    int basePoints = (duration.inHours * AppConstants.pointsPerHour).round();
-    return isWinner ? basePoints + AppConstants.bonusWinPoints : basePoints;
+
+  Future<void> createBooking({
+    required String tableId,
+    required String date,
+    required String startTime,
+    required String endTime,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      int? userId;
+      if (token != null) {
+        final decoded = JwtDecoder.decode(token);
+        userId = decoded['id'];
+      }
+
+      final response = await http.post(
+        Uri.parse(ApiConstants.bookings),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'user_id': userId,
+          'table_id': int.tryParse(tableId) ?? tableId,
+          'date': date,
+          'start_time': startTime,
+          'end_time': endTime,
+          'status': 'pending', // Set status pending saat booking baru
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        await fetchUserBookings();
+      } else if (response.statusCode == 409) {
+        throw Exception('409');
+      } else {
+        throw Exception('Failed to create booking');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateBookingStatus(String bookingId, String status) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      // Gunakan endpoint PUT /bookings/:id sesuai request.rest
+      final response = await http.put(
+        Uri.parse('${ApiConstants.bookings}/$bookingId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'status': status}),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchBookings();
+      } else {
+        throw Exception('Failed to update booking status');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> cancelBooking(String bookingId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.patch(
+        Uri.parse('${ApiConstants.bookings}/$bookingId/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'status': 'cancelled'}),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchUserBookings();
+      } else {
+        throw Exception('Failed to cancel booking');
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 }
-

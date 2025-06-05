@@ -1,86 +1,61 @@
-// ================================
-// lib/screens/admin/table_form_screen.dart - Form Tambah/Edit Meja
-// ================================
 import 'package:flutter/material.dart';
-import '../../constants.dart';
+import 'package:provider/provider.dart';
 import '../../models/table_model.dart';
 import '../../services/table_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 
 class TableFormScreen extends StatefulWidget {
+  final TableModel? table;
+
+  const TableFormScreen({super.key, this.table});
+
   @override
-  _TableFormScreenState createState() => _TableFormScreenState();
+  State<TableFormScreen> createState() => _TableFormScreenState();
 }
 
 class _TableFormScreenState extends State<TableFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _imageUrlController = TextEditingController();
-  final _priceController = TextEditingController();
-
-  TableStatus _selectedStatus = TableStatus.available;
-  bool _isLoading = false;
-  TableModel? _editingTable;
+  String _status = 'available';
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    final TableModel? table =
-        ModalRoute.of(context)?.settings.arguments as TableModel?;
-    if (table != null && _editingTable == null) {
-      _editingTable = table;
-      _nameController.text = table.name;
-      _descriptionController.text = table.description;
-      _imageUrlController.text = table.imageUrl;
-      _priceController.text = table.pricePerHour.toString();
-      _selectedStatus = table.status;
+  void initState() {
+    super.initState();
+    if (widget.table != null) {
+      _nameController.text = widget.table!.name;
+      _imageUrlController.text = widget.table!.imageUrl;
+      _status = widget.table!.status;
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _descriptionController.dispose();
     _imageUrlController.dispose();
-    _priceController.dispose();
     super.dispose();
   }
 
-  _saveTable() async {
+  Future<void> _saveTable() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      TableModel table = TableModel(
-        id: _editingTable?.id ??
-            DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _nameController.text,
-        description: _descriptionController.text,
-        imageUrl: _imageUrlController.text,
-        status: _selectedStatus,
-        pricePerHour: double.tryParse(_priceController.text) ?? 0.0,
+      final tableService = Provider.of<TableService>(context, listen: false);
+      final table = TableModel(
+        id: widget.table?.id ?? '',
+        name: _nameController.text.trim(),
+        status: _status,
+        imageUrl: _imageUrlController.text.trim(),
+        createdAt: widget.table?.createdAt ?? DateTime.now().toString(),
+        updatedAt: DateTime.now().toString(),
       );
 
-      try {
-        if (_editingTable == null) {
-          await TableService.addTable(table);
-        } else {
-          await TableService.updateTable(table);
-        }
-        Navigator.of(context).pop();
-      } catch (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan meja. Coba lagi!')),
-        );
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
+      if (widget.table == null) {
+        await tableService.addTable(table);
+      } else {
+        await tableService.updateTable(table);
       }
+
+      Navigator.pop(context);
     }
   }
 
@@ -88,91 +63,67 @@ class _TableFormScreenState extends State<TableFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_editingTable == null ? 'Tambah Meja' : 'Edit Meja'),
+        title: Text(widget.table == null ? 'Add Table' : 'Edit Table'),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CustomTextField(
                 controller: _nameController,
-                label: 'Nama Meja',
+                label: 'Table Name',
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Nama meja wajib diisi';
+                    return 'Please enter table name';
                   }
                   return null;
                 },
               ),
-              SizedBox(height: 16),
-              CustomTextField(
-                controller: _descriptionController,
-                label: 'Deskripsi',
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Deskripsi wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               CustomTextField(
                 controller: _imageUrlController,
-                label: 'URL Gambar',
+                label: 'Image URL',
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'URL gambar wajib diisi';
+                    return 'Please enter image URL';
                   }
                   return null;
                 },
               ),
-              SizedBox(height: 16),
-              CustomTextField(
-                controller: _priceController,
-                label: 'Harga per Jam',
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Harga wajib diisi';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Masukkan angka yang valid';
-                  }
-                  return null;
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _status,
+                items: const [
+                  DropdownMenuItem(
+                    value: 'available',
+                    child: Text('Available'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'pending',
+                    child: Text('pending'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'maintenance',
+                    child: Text('Maintenance'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _status = value!;
+                  });
                 },
-              ),
-              SizedBox(height: 16),
-              DropdownButtonFormField<TableStatus>(
-                value: _selectedStatus,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Status',
                   border: OutlineInputBorder(),
                 ),
-                items: TableStatus.values.map((status) {
-                  return DropdownMenuItem<TableStatus>(
-                    value: status,
-                    child: Text(status == TableStatus.available
-                        ? 'Tersedia'
-                        : 'Tidak Tersedia'),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedStatus = value!;
-                  });
-                },
               ),
-              SizedBox(height: 24),
-              _isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : CustomButton(
-                      text: _editingTable == null ? 'Simpan' : 'Update',
-                      onPressed: _saveTable,
-                    ),
+              const SizedBox(height: 24),
+              CustomButton(
+                text: 'Save',
+                onPressed: _saveTable,
+              ),
             ],
           ),
         ),

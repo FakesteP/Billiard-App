@@ -4,7 +4,8 @@ import jwt from "jsonwebtoken";
 // Register
 export const register = async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    let { username, email, password, role } = req.body;
+    if (!role) role = "customer"; // Set default role jika tidak ada
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
       username,
@@ -12,9 +13,24 @@ export const register = async (req, res) => {
       password: hashedPassword,
       role,
     });
-    res.status(201).json({ message: "User registered", user });
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "1d" }
+    );
+    res.status(201).json({ message: "User registered", user, token }); // Kirim token juga
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    // Tambahkan error.errors jika ada (Sequelize validation)
+    res.status(500).json({
+      message: error.message,
+      errors: error.errors || null,
+    });
   }
 };
 
@@ -23,15 +39,12 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Cari user berdasarkan email
     const user = await User.findOne({ where: { email } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Cek password
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: "Invalid password" });
 
-    // Generate JWT
     const token = jwt.sign(
       {
         id: user.id,
@@ -43,8 +56,16 @@ export const login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    // Kirim token ke client
-    res.status(200).json({ token });
+    // Kirim token dan user
+    res.status(200).json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

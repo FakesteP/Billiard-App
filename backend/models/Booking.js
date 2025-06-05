@@ -40,8 +40,8 @@ const Booking = db.define(
       allowNull: false,
     },
     status: {
-      type: Sequelize.ENUM("booked", "cancelled", "completed"),
-      defaultValue: "booked",
+      type: Sequelize.ENUM("pending", "cancelled", "completed"),
+      defaultValue: "pending",
       allowNull: false,
     },
   },

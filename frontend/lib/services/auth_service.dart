@@ -1,69 +1,113 @@
-
-// ================================
-// lib/services/auth_service.dart - Service Autentikasi
-// ================================
-import 'dart:convert';
-// import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../constants.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
-class AuthService {
-  static UserModel? _currentUser;
-  
-  static UserModel? get currentUser => _currentUser;
-  
-  // Mock login - ganti dengan API call sesungguhnya
-  static Future<bool> login(String email, String password) async {
+class AuthService with ChangeNotifier {
+  UserModel? _user;
+  bool _isAuthenticated = false;
+  String? errorMessage; // Tambahkan ini
+
+  UserModel? get user => _user;
+  bool get isAuthenticated => _isAuthenticated;
+  String? _role;
+  String? get role => _role;
+
+  Future<void> login(String email, String password) async {
     try {
-      // Simulasi API call
-      await Future.delayed(Duration(seconds: 2));
-      
-      // Mock data - ganti dengan response API
-      if (email == 'admin@billiard.com' && password == 'admin123') {
-        _currentUser = UserModel(
-          id: '1',
-          name: 'Admin',
-          email: email,
-          phone: '081234567890',
-          role: UserRole.admin,
-          createdAt: DateTime.now(),
-        );
-        return true;
-      } else if (email == 'user@billiard.com' && password == 'user123') {
-        _currentUser = UserModel(
-          id: '2',
-          name: 'John Doe',
-          email: email,
-          phone: '081234567891',
-          role: UserRole.user,
-          points: 150,
-          createdAt: DateTime.now(),
-        );
-        return true;
+      final response = await http.post(
+        Uri.parse(ApiConstants.login),
+        body: json.encode({
+          'email': email,
+          'password': password,
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['token'] != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', data['token']);
+          // Decode JWT untuk ambil role
+          Map<String, dynamic> decodedToken = JwtDecoder.decode(data['token']);
+          _role = decodedToken['role'];
+          await prefs.setString('role', _role ?? '');
+          _isAuthenticated = true;
+          errorMessage = null;
+        } else {
+          errorMessage = 'Invalid response from server. Please contact admin.';
+          _isAuthenticated = false;
+        }
+        notifyListeners();
+      } else {
+        print('Login failed: ${response.body}');
+        final data = json.decode(response.body);
+        errorMessage = data['message'] ?? 'Login failed';
+        _isAuthenticated = false;
+        notifyListeners();
       }
-      return false;
     } catch (e) {
-      return false;
+      errorMessage = 'Login failed. Please try again.';
+      _isAuthenticated = false;
+      notifyListeners();
     }
   }
-  
-  static Future<bool> register(String name, String email, String phone, String password) async {
-    try {
-      // Simulasi API call
-      await Future.delayed(Duration(seconds: 2));
-      
-      // Mock success - ganti dengan API call sesungguhnya
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-  
-  static void logout() {
-    _currentUser = null;
-  }
-  
-  static bool get isLoggedIn => _currentUser != null;
-  static bool get isAdmin => _currentUser?.role == UserRole.admin;
-}
 
+  Future<void> register(String username, String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConstants.register),
+        body: json.encode({
+          'username': username,
+          'email': email,
+          'password': password,
+          'role': 'customer',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 201) {
+        errorMessage = null;
+        notifyListeners();
+      } else {
+        print('Register failed: ${response.body}');
+        final data = json.decode(response.body);
+        errorMessage = data['message'] ?? 'Registration failed';
+        if (data['errors'] != null && data['errors'] is List) {
+          final errors = (data['errors'] as List)
+              .map((e) => e['message'] ?? e.toString())
+              .join('\n');
+          errorMessage = '$errorMessage\n$errors';
+        }
+        _isAuthenticated = false;
+        notifyListeners();
+      }
+    } catch (e) {
+      errorMessage = 'Registration failed. Please try again.';
+      _isAuthenticated = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> checkAuthStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    _role = prefs.getString('role');
+    _isAuthenticated = token != null;
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    await prefs.remove('role');
+    _user = null;
+    _isAuthenticated = false;
+    _role = null;
+    notifyListeners();
+  }
+}
