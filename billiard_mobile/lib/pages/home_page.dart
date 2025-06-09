@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../services/statistics_service.dart';
 import 'table_list_page.dart';
 import 'booking_list_page.dart';
 
@@ -19,6 +20,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Animation<double> _slideAnimation;
   late Animation<double> _pulseAnimation;
 
+  // Statistics data
+  Map<String, dynamic>? _dashboardStats;
+  Map<String, dynamic>? _userStats;
+  Map<String, dynamic>? _tablesStats;
+  bool _isLoadingStats = true;
   @override
   void initState() {
     super.initState();
@@ -43,6 +49,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     _animationController.forward();
     _pulseController.repeat(reverse: true);
+
+    // Load statistics data
+    _loadStatistics();
+  }
+
+  Future<void> _loadStatistics() async {
+    try {
+      setState(() {
+        _isLoadingStats = true;
+      });
+
+      // Load dashboard stats (public)
+      final dashboardStats = await StatisticsService.getDashboardStats();
+
+      // Load tables stats (public)
+      final tablesStats = await StatisticsService
+          .getAvailableTablesStats(); // Load user stats (protected) - only if user is logged in
+      final authProvider = context.read<AuthProvider>();
+      Map<String, dynamic>? userStats;
+      if (authProvider.isLoggedIn) {
+        userStats = await StatisticsService.getUserStats();
+      }
+
+      setState(() {
+        _dashboardStats = dashboardStats;
+        _tablesStats = tablesStats;
+        _userStats = userStats;
+        _isLoadingStats = false;
+      });
+    } catch (e) {
+      print('Error loading statistics: $e');
+      setState(() {
+        _isLoadingStats = false;
+      });
+    }
   }
 
   @override
@@ -79,23 +120,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 opacity: _fadeAnimation.value,
                 child: Transform.translate(
                   offset: Offset(0, _slideAnimation.value),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        // Enhanced Header with welcome message
-                        _buildEnhancedHeader(authProvider),
+                  child: RefreshIndicator(
+                    onRefresh: _loadStatistics,
+                    color: AppTheme.primaryColor,
+                    backgroundColor: AppTheme.cardColor,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          // Enhanced Header with welcome message
+                          _buildEnhancedHeader(authProvider),
 
-                        // Quick Stats Cards
-                        _buildQuickStats(role),
+                          // Quick Stats Cards
+                          _buildQuickStats(role),
 
-                        // Main Navigation Section
-                        _buildMainNavigation(context, role),
+                          // Main Navigation Section
+                          _buildMainNavigation(context, role),
 
-                        // Recent Activity or Features
-                        _buildRecentActivity(role),
-
-                        const SizedBox(height: 20),
-                      ],
+                          // Recent Activity or Features
+                          _buildRecentActivity(role),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -262,6 +308,39 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildQuickStats(String? role) {
+    if (_isLoadingStats) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        child: Row(
+          children: [
+            Expanded(child: _buildLoadingStatCard()),
+            const SizedBox(width: 16),
+            Expanded(child: _buildLoadingStatCard()),
+            const SizedBox(width: 16),
+            Expanded(child: _buildLoadingStatCard()),
+          ],
+        ),
+      );
+    }
+
+    // Get statistics values based on role and available data
+    String availableTablesValue = '0';
+    String bookingsValue = '0';
+    String thirdStatValue = '0';
+
+    if (role == 'admin') {
+      // Admin sees: Total Tables, Total Bookings, Active Bookings
+      availableTablesValue = _tablesStats?['totalTables']?.toString() ?? '0';
+      bookingsValue = _dashboardStats?['todayBookings']?.toString() ?? '0';
+      thirdStatValue = _dashboardStats?['activeBookings']?.toString() ?? '0';
+    } else {
+      // Customer sees: Available Tables, My Bookings, Hours Played
+      availableTablesValue =
+          _tablesStats?['availableTables']?.toString() ?? '0';
+      bookingsValue = _userStats?['totalBookings']?.toString() ?? '0';
+      thirdStatValue = _userStats?['totalHours']?.toString() ?? '0';
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -269,7 +348,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Expanded(
             child: _buildStatCard(
               title: role == 'admin' ? 'Total Tables' : 'Available Tables',
-              value: '12',
+              value: availableTablesValue,
               icon: Icons.table_restaurant,
               color: AppTheme.successColor,
             ),
@@ -277,8 +356,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           const SizedBox(width: 16),
           Expanded(
             child: _buildStatCard(
-              title: role == 'admin' ? 'Total Bookings' : 'My Bookings',
-              value: role == 'admin' ? '45' : '3',
+              title: role == 'admin' ? 'Today\'s Bookings' : 'My Bookings',
+              value: bookingsValue,
               icon: Icons.event_available,
               color: AppTheme.primaryColor,
             ),
@@ -286,10 +365,58 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           const SizedBox(width: 16),
           Expanded(
             child: _buildStatCard(
-              title: role == 'admin' ? 'Active Users' : 'Hours Played',
-              value: role == 'admin' ? '128' : '24',
-              icon: role == 'admin' ? Icons.people : Icons.access_time,
+              title: role == 'admin' ? 'Active Bookings' : 'Hours Played',
+              value: thirdStatValue,
+              icon: role == 'admin' ? Icons.pending_actions : Icons.access_time,
               color: AppTheme.warningColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingStatCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.cardColor.withOpacity(0.5),
+        border: Border.all(
+          color: AppTheme.borderColor.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.borderColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.hourglass_empty,
+              color: AppTheme.textSecondary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 24,
+            width: 40,
+            decoration: BoxDecoration(
+              color: AppTheme.borderColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            height: 12,
+            width: 60,
+            decoration: BoxDecoration(
+              color: AppTheme.borderColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
         ],
