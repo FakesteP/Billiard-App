@@ -1,4 +1,4 @@
-const User = require("../models/user");
+import User from "../models/user.js";
 
 // Mendapatkan semua user
 export const getAllUsers = async (req, res) => {
