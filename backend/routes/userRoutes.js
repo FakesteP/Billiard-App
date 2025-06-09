@@ -21,3 +21,7 @@ router.put("/:id", updateUser);
 router.delete("/:id", deleteUser);
 
 export default router;
+
+// Pastikan file ini di-import di app.js/server.js dengan:
+// import userRoutes from "./routes/userRoutes.js";
+// app.use("/users", userRoutes);
