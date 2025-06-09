@@ -467,6 +467,47 @@ class _TableListPageState extends State<TableListPage> {
           ),
         ),
       ),
+      floatingActionButton: role == 'admin'
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryColor,
+                    AppTheme.accentColor,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: FloatingActionButton(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TableFormPage(),
+                    ),
+                  );
+                  if (result == true) {
+                    fetchTables();
+                  }
+                },
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: const Icon(
+                  Icons.add,
+                  color: AppTheme.textPrimary,
+                  size: 28,
+                ),
+              ),
+            )
+          : null,
     );
   }
 }

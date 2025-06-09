@@ -58,30 +58,106 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _isLoadingStats = true;
       });
 
-      // Load dashboard stats (public)
-      final dashboardStats = await StatisticsService.getDashboardStats();
-
-      // Load tables stats (public)
-      final tablesStats = await StatisticsService
-          .getAvailableTablesStats(); // Load user stats (protected) - only if user is logged in
-      final authProvider = context.read<AuthProvider>();
+      // Initialize with default values
+      Map<String, dynamic> dashboardStats = {
+        'availableTables': 0,
+        'totalTables': 0,
+        'todayBookings': 0,
+        'activeBookings': 0,
+      };
+      Map<String, dynamic> tablesStats = {
+        'availableTables': 0,
+        'totalTables': 0,
+      };
       Map<String, dynamic>? userStats;
 
-      if (authProvider.isLoggedIn) {
-        userStats = await StatisticsService.getUserStats();
+      // Try to load dashboard stats (public)
+      try {
+        final result = await StatisticsService.getDashboardStats();
+        if (result != null) {
+          dashboardStats = result;
+        }
+      } catch (e) {
+        print('Error loading dashboard stats: $e');
       }
 
-      setState(() {
-        _dashboardStats = dashboardStats;
-        _tablesStats = tablesStats;
-        _userStats = userStats;
-        _isLoadingStats = false;
-      });
+      // Try to load tables stats (public)
+      try {
+        final result = await StatisticsService.getAvailableTablesStats();
+        if (result != null) {
+          tablesStats = result;
+        }
+      } catch (e) {
+        print('Error loading tables stats: $e');
+      }
+
+      // Load user stats (protected) - only if user is logged in
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.isLoggedIn) {
+        try {
+          userStats = await StatisticsService.getUserStats();
+        } catch (e) {
+          print('Error loading user stats: $e');
+          // Set default user stats if loading fails
+          userStats = {
+            'totalBookings': 0,
+            'totalHours': 0,
+            'completedBookings': 0,
+          };
+        }
+      } else {
+        // Set default user stats for non-logged in users
+        userStats = {
+          'totalBookings': 0,
+          'totalHours': 0,
+          'completedBookings': 0,
+        };
+      }
+
+      if (mounted) {
+        setState(() {
+          _dashboardStats = dashboardStats;
+          _tablesStats = tablesStats;
+          _userStats = userStats;
+          _isLoadingStats = false;
+        });
+      }
     } catch (e) {
       print('Error loading statistics: $e');
-      setState(() {
-        _isLoadingStats = false;
-      });
+      if (mounted) {
+        setState(() {
+          // Set fallback data
+          _dashboardStats = {
+            'availableTables': 0,
+            'totalTables': 0,
+            'todayBookings': 0,
+            'activeBookings': 0,
+          };
+          _tablesStats = {
+            'availableTables': 0,
+            'totalTables': 0,
+          };
+          _userStats = {
+            'totalBookings': 0,
+            'totalHours': 0,
+            'completedBookings': 0,
+          };
+          _isLoadingStats = false;
+        });
+
+        // Show error message to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to load statistics. Using offline mode.'),
+            backgroundColor: AppTheme.warningColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: EdgeInsets.all(16),
+          ),
+        );
+      }
     }
   }
 
@@ -318,22 +394,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       );
     }
 
-    // Get statistics values based on role and available data
+    // Get statistics values based on role and available data with safe null checks
     String availableTablesValue = '0';
     String bookingsValue = '0';
     String thirdStatValue = '0';
 
-    if (role == 'admin') {
-      // Admin sees: Total Tables, Total Bookings, Active Bookings
-      availableTablesValue = _tablesStats?['totalTables']?.toString() ?? '0';
-      bookingsValue = _dashboardStats?['todayBookings']?.toString() ?? '0';
-      thirdStatValue = _dashboardStats?['activeBookings']?.toString() ?? '0';
-    } else {
-      // Customer sees: Available Tables, My Bookings, Hours Played
-      availableTablesValue =
-          _tablesStats?['availableTables']?.toString() ?? '0';
-      bookingsValue = _userStats?['totalBookings']?.toString() ?? '0';
-      thirdStatValue = _userStats?['totalHours']?.toString() ?? '0';
+    try {
+      if (role == 'admin') {
+        // Admin sees: Total Tables, Total Bookings, Active Bookings
+        availableTablesValue = (_tablesStats?['totalTables'] ?? 0).toString();
+        bookingsValue = (_dashboardStats?['todayBookings'] ?? 0).toString();
+        thirdStatValue = (_dashboardStats?['activeBookings'] ?? 0).toString();
+      } else {
+        // Customer sees: Available Tables, My Bookings, Hours Played
+        availableTablesValue =
+            (_tablesStats?['availableTables'] ?? 0).toString();
+        bookingsValue = (_userStats?['totalBookings'] ?? 0).toString();
+        thirdStatValue = (_userStats?['totalHours'] ?? 0).toString();
+      }
+    } catch (e) {
+      print('Error displaying statistics: $e');
+      // Keep default values of '0'
     }
 
     return Container(
