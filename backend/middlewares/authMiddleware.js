@@ -29,4 +29,6 @@ const authMiddleware = (roles = []) => {
   };
 };
 
+// Export sebagai named export dan default export
+export { authMiddleware };
 export default authMiddleware;

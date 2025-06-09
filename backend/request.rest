@@ -96,3 +96,23 @@ Content-Type: application/json
 ### Delete Booking (DELETE /bookings/:id) - admin only
 DELETE http://localhost:5000/bookings/1
 Authorization: Bearer {{token}}
+
+### Get All Users (GET /users)
+GET http://localhost:5000/users
+
+### Get User by ID (GET /users/:id)
+GET http://localhost:5000/users/1
+
+### Update User (PUT /users/:id)
+PUT http://localhost:5000/users/1
+Content-Type: application/json
+
+{
+  "username": "updateduser",
+  "email": "updateduser@example.com",
+  "point": 100,
+  "role": "customer"
+}
+
+### Delete User (DELETE /users/:id)
+DELETE http://localhost:5000/users/1
