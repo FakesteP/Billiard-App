@@ -37,15 +37,19 @@ class _BookingFormPageState extends State<BookingFormPage> {
           'user_id': userId,
           'table_id': widget.tableId,
           'date': selectedDate!.toIso8601String().substring(0, 10),
-          'start_time': startTime!.format(context),
-          'end_time': endTime!.format(context),
+          'start_time': startTime!.hour.toString().padLeft(2, '0') + ':' + startTime!.minute.toString().padLeft(2, '0'),
+          'end_time': endTime!.hour.toString().padLeft(2, '0') + ':' + endTime!.minute.toString().padLeft(2, '0'),
         }),
       );
       if (response.statusCode == 201 || response.statusCode == 200) {
         Navigator.pop(context, true);
       } else {
-        final data = jsonDecode(response.body);
-        setState(() { errorMessage = data['message'] ?? 'Gagal booking'; });
+        final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+        setState(() {
+          errorMessage = data != null && data['message'] != null
+              ? 'Gagal booking: ' + data['message']
+              : 'Gagal booking (${response.statusCode}): ' + response.body;
+        });
       }
     } catch (e) {
       setState(() { errorMessage = 'Terjadi kesalahan'; });
