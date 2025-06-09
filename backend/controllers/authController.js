@@ -1,4 +1,4 @@
-import User from "../models/User.js";
+import User from "../models/Users";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 // Register

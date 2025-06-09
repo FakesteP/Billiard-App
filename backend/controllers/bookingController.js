@@ -1,6 +1,6 @@
 import Booking from "../models/Booking.js";
 import Table from "../models/Table.js";
-import User from "../models/user.js";
+import User from "../models/Users.js";
 import { Op } from "sequelize";
 
 // Get all bookings

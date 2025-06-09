@@ -1,6 +1,6 @@
 import { Sequelize } from "sequelize";
 import db from "../config/database.js";
-import User from "./User.js";
+import User from "./Users.js";
 import Table from "./Table.js";
 
 const Booking = db.define(
