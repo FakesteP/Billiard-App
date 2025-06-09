@@ -19,11 +19,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
   late Animation<double> _pulseAnimation;
-
   // Statistics data
   Map<String, dynamic>? _dashboardStats;
   Map<String, dynamic>? _userStats;
   Map<String, dynamic>? _tablesStats;
+  Map<String, dynamic>? _activities; // Add activities data
   bool _isLoadingStats = true;
   @override
   void initState() {
@@ -64,18 +64,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       final dashboardStats = await StatisticsService.getDashboardStats();
 
       // Load tables stats (public)
-      final tablesStats = await StatisticsService
-          .getAvailableTablesStats(); // Load user stats (protected) - only if user is logged in
+      final tablesStats = await StatisticsService.getAvailableTablesStats();
+
+      // Load user stats (protected) - only if user is logged in
       final authProvider = context.read<AuthProvider>();
       Map<String, dynamic>? userStats;
+      Map<String, dynamic>? activities;
+
       if (authProvider.isLoggedIn) {
         userStats = await StatisticsService.getUserStats();
+
+        // Load activities based on role
+        if (authProvider.role == 'admin') {
+          activities = await StatisticsService.getAdminActivities();
+        } else {
+          activities = await StatisticsService.getUserActivities();
+        }
       }
 
       setState(() {
         _dashboardStats = dashboardStats;
         _tablesStats = tablesStats;
         _userStats = userStats;
+        _activities = activities;
         _isLoadingStats = false;
       });
     } catch (e) {

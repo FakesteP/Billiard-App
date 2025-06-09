@@ -165,3 +165,170 @@ export const getAvailableTablesStats = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Get recent activities for admin
+export const getAdminActivities = async (req, res) => {
+  try {
+    const activities = [];
+
+    // Get recent bookings with user and table info
+    const recentBookings = await Booking.findAll({
+      limit: 5,
+      order: [["tanggal_dibuat", "DESC"]],
+      include: [
+        {
+          model: User,
+          attributes: ["username", "role"],
+        },
+        {
+          model: Table,
+          attributes: ["name"],
+        },
+      ],
+    });
+
+    recentBookings.forEach((booking) => {
+      const timeAgo = getTimeAgo(booking.tanggal_dibuat);
+      activities.push({
+        icon: "event_available",
+        title: `Booking ${booking.status}`,
+        subtitle: `${booking.User.username} - ${booking.Table.name}`,
+        time: timeAgo,
+        type: "booking",
+      });
+    });
+
+    // Get recent completed bookings
+    const completedBookings = await Booking.findAll({
+      where: { status: "completed" },
+      limit: 3,
+      order: [["tanggal_diperbarui", "DESC"]],
+      include: [
+        {
+          model: User,
+          attributes: ["username"],
+        },
+        {
+          model: Table,
+          attributes: ["name"],
+        },
+      ],
+    });
+
+    completedBookings.forEach((booking) => {
+      const timeAgo = getTimeAgo(booking.tanggal_diperbarui);
+      activities.push({
+        icon: "sports_bar",
+        title: "Session completed",
+        subtitle: `${booking.User.username} - ${booking.Table.name}`,
+        time: timeAgo,
+        type: "completed",
+      });
+    });
+
+    // Sort all activities by time
+    activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    res.json({
+      activities: activities.slice(0, 5), // Return top 5 activities
+    });
+  } catch (error) {
+    console.error("Error getting admin activities:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get recent activities for user
+export const getUserActivities = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const activities = [];
+
+    // Get user's recent bookings
+    const userBookings = await Booking.findAll({
+      where: { user_id: userId },
+      limit: 5,
+      order: [["tanggal_dibuat", "DESC"]],
+      include: [
+        {
+          model: Table,
+          attributes: ["name"],
+        },
+      ],
+    });
+
+    userBookings.forEach((booking) => {
+      const timeAgo = getTimeAgo(booking.tanggal_dibuat);
+      let title = "";
+      let icon = "";
+
+      switch (booking.status) {
+        case "pending":
+          title = "Booking confirmed";
+          icon = "event_available";
+          break;
+        case "completed":
+          title = "Session completed";
+          icon = "sports_bar";
+          break;
+        case "cancelled":
+          title = "Booking cancelled";
+          icon = "cancel";
+          break;
+        default:
+          title = "Booking created";
+          icon = "event";
+      }
+
+      activities.push({
+        icon: icon,
+        title: title,
+        subtitle: `${booking.Table.name} - ${booking.date}`,
+        time: timeAgo,
+        type: booking.status,
+      });
+    });
+
+    // Add achievement for completed sessions
+    const completedCount = await Booking.count({
+      where: {
+        user_id: userId,
+        status: "completed",
+      },
+    });
+
+    if (completedCount >= 10) {
+      activities.push({
+        icon: "people",
+        title: "Achievement unlocked",
+        subtitle: `Played ${completedCount}+ sessions`,
+        time: "Recently",
+        type: "achievement",
+      });
+    }
+
+    res.json({
+      activities: activities.slice(0, 5), // Return top 5 activities
+    });
+  } catch (error) {
+    console.error("Error getting user activities:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Helper function to calculate time ago
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - new Date(date);
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) {
+    return `${diffMins} minutes ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} hours ago`;
+  } else {
+    return `${diffDays} days ago`;
+  }
+}

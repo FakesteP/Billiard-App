@@ -7,7 +7,7 @@ class StatisticsService {
   static Future<Map<String, dynamic>?> getDashboardStats() async {
     try {
       final response = await ApiService.get('/statistics/dashboard');
-      
+
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
@@ -25,7 +25,7 @@ class StatisticsService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      
+
       if (token == null) {
         print('No auth token found');
         return null;
@@ -38,7 +38,7 @@ class StatisticsService {
           'Authorization': 'Bearer $token',
         },
       );
-      
+
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
@@ -55,7 +55,7 @@ class StatisticsService {
   static Future<Map<String, dynamic>?> getAvailableTablesStats() async {
     try {
       final response = await ApiService.get('/statistics/tables');
-      
+
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
@@ -64,6 +64,68 @@ class StatisticsService {
       }
     } catch (e) {
       print('Error getting tables stats: $e');
+      return null;
+    }
+  }
+
+  // Get admin activities (protected - admin only)
+  static Future<Map<String, dynamic>?> getAdminActivities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        print('No token found');
+        return null;
+      }
+
+      final response = await ApiService.get(
+        '/statistics/admin/activities',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('Failed to get admin activities: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error getting admin activities: $e');
+      return null;
+    }
+  }
+
+  // Get user activities (protected)
+  static Future<Map<String, dynamic>?> getUserActivities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        print('No token found');
+        return null;
+      }
+
+      final response = await ApiService.get(
+        '/statistics/user/activities',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('Failed to get user activities: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error getting user activities: $e');
       return null;
     }
   }
