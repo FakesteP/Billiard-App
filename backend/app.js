@@ -14,7 +14,7 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/tables", tableRoutes);
 app.use("/bookings", bookingRoutes);
-app.use("/api", userRoutes);
+app.use("/users", userRoutes);
 
 // Letakkan error handler paling bawah setelah route
 app.use(errorHandler);

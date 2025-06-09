@@ -37,8 +37,13 @@ class _UserListPageState extends State<UserListPage> {
         } else {
           errorMessage = 'Format data user tidak dikenali';
         }
+      } else if (response.statusCode == 404) {
+        errorMessage = 'Endpoint /users tidak ditemukan di server (404). Cek URL endpoint di backend.';
+        debugPrint('Response body: ' + response.body);
+      } else if (response.statusCode == 401) {
+        errorMessage = 'Akses ditolak. Silakan login ulang.';
       } else {
-        errorMessage = 'Gagal memuat data user';
+        errorMessage = 'Gagal memuat data user (${response.statusCode}): ' + response.body;
       }
     } catch (e) {
       errorMessage = 'Terjadi kesalahan';
