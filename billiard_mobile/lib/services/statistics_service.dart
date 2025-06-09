@@ -72,10 +72,10 @@ class StatisticsService {
   static Future<Map<String, dynamic>?> getAdminActivities() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final token = prefs.getString('auth_token');
 
       if (token == null) {
-        print('No token found');
+        print('No auth token found');
         return null;
       }
 
@@ -103,10 +103,10 @@ class StatisticsService {
   static Future<Map<String, dynamic>?> getUserActivities() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final token = prefs.getString('auth_token');
 
       if (token == null) {
-        print('No token found');
+        print('No auth token found');
         return null;
       }
 

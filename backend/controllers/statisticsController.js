@@ -1,5 +1,6 @@
 import Table from "../models/Table.js";
 import Booking from "../models/Booking.js";
+import User from "../models/User.js";
 import { Op, Sequelize } from "sequelize";
 
 // Get statistics for dashboard

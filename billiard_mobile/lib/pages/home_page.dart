@@ -18,12 +18,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
-  late Animation<double> _pulseAnimation;
-  // Statistics data
+  late Animation<double> _pulseAnimation; // Statistics data
   Map<String, dynamic>? _dashboardStats;
   Map<String, dynamic>? _userStats;
   Map<String, dynamic>? _tablesStats;
-  Map<String, dynamic>? _activities; // Add activities data
   bool _isLoadingStats = true;
   @override
   void initState() {
@@ -64,29 +62,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       final dashboardStats = await StatisticsService.getDashboardStats();
 
       // Load tables stats (public)
-      final tablesStats = await StatisticsService.getAvailableTablesStats();
-
-      // Load user stats (protected) - only if user is logged in
+      final tablesStats = await StatisticsService
+          .getAvailableTablesStats(); // Load user stats (protected) - only if user is logged in
       final authProvider = context.read<AuthProvider>();
       Map<String, dynamic>? userStats;
-      Map<String, dynamic>? activities;
 
       if (authProvider.isLoggedIn) {
         userStats = await StatisticsService.getUserStats();
-
-        // Load activities based on role
-        if (authProvider.role == 'admin') {
-          activities = await StatisticsService.getAdminActivities();
-        } else {
-          activities = await StatisticsService.getUserActivities();
-        }
       }
 
       setState(() {
         _dashboardStats = dashboardStats;
         _tablesStats = tablesStats;
         _userStats = userStats;
-        _activities = activities;
         _isLoadingStats = false;
       });
     } catch (e) {
@@ -143,13 +131,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           _buildEnhancedHeader(authProvider),
 
                           // Quick Stats Cards
-                          _buildQuickStats(role),
-
-                          // Main Navigation Section
+                          _buildQuickStats(role), // Main Navigation Section
                           _buildMainNavigation(context, role),
 
-                          // Recent Activity or Features
-                          _buildRecentActivity(role),
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -568,205 +552,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildRecentActivity(String? role) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.cardColor.withOpacity(0.9),
-            AppTheme.surfaceColor.withOpacity(0.8),
-          ],
-        ),
-        border: Border.all(
-          color: AppTheme.borderColor.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryColor.withOpacity(0.2),
-                      AppTheme.accentColor.withOpacity(0.2),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.timeline,
-                  color: AppTheme.primaryColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                role == 'admin' ? 'Recent Activity' : 'Your Activity',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildActivityItem(
-            icon: Icons.sports_bar,
-            title:
-                role == 'admin' ? 'New table added' : 'Last session completed',
-            subtitle:
-                role == 'admin' ? 'Table #13 - Premium' : 'Table #5 - 2 hours',
-            time: '2 hours ago',
-          ),
-          const SizedBox(height: 12),
-          _buildActivityItem(
-            icon: Icons.event_available,
-            title: role == 'admin' ? 'Booking confirmed' : 'Booking reminder',
-            subtitle: role == 'admin'
-                ? 'Customer John - Table #7'
-                : 'Tomorrow at 3 PM',
-            time: '5 hours ago',
-          ),
-          const SizedBox(height: 12),
-          _buildActivityItem(
-            icon: Icons.people,
-            title: role == 'admin'
-                ? 'New user registered'
-                : 'Achievement unlocked',
-            subtitle:
-                role == 'admin' ? 'Sarah Miller joined' : 'Played 10+ hours',
-            time: '1 day ago',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String time,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceColor.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: AppTheme.textSecondary,
-            size: 16,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          time,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-        ),
-      ],
-    );
-  }
-
-  void _showLogoutDialog(AuthProvider authProvider) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.errorColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.logout,
-                  color: AppTheme.errorColor,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Logout',
-                style: TextStyle(color: AppTheme.textPrimary),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Are you sure you want to logout?',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.errorColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await authProvider.logout();
-                // Navigation will be handled automatically by AuthWrapper
-              },
-              child: const Text(
-                'Logout',
-                style: TextStyle(color: AppTheme.textPrimary),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildNavigationCard(
     BuildContext context, {
     required String title,
@@ -879,6 +664,70 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
       ),
+    );
+  }
+
+  void _showLogoutDialog(AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.cardColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.errorColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.logout,
+                  color: AppTheme.errorColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Logout',
+                style: TextStyle(color: AppTheme.textPrimary),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await authProvider.logout();
+                // Navigation will be handled automatically by AuthWrapper
+              },
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: AppTheme.textPrimary),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
